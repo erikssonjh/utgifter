@@ -129,6 +129,7 @@ function parseCSV(content, fileName) {
             header: true,
             delimiter: ';',
             skipEmptyLines: true,
+            delimitersToGuess: [';', ',', '\t'],  // Testa olika avgränsare automatiskt
             complete: (results) => {
                 if (results.errors.length > 0) {
                     reject(new Error(`Parse fel: ${results.errors[0].message}`));

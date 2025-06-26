@@ -375,12 +375,21 @@
 
             // Funktion för att normalisera transaktionsdata
             const normalizeTransaction = (transaction, account, fileType) => {
+                // Hjälpfunktion för att parsa svenska decimaler (komma till punkt)
+                const parseSwedishNumber = (value) => {
+                    if (!value) return 0;
+                    // Konvertera till string och ersätt komma med punkt
+                    const stringValue = String(value).trim();
+                    const normalizedValue = stringValue.replace(',', '.');
+                    return parseFloat(normalizedValue) || 0;
+                };
+
                 if (fileType === 'simple') {
                     // Format för 25.csv
                     return {
                         date: transaction.Datum,
                         description: transaction.Beskrivning?.trim() || '',
-                        amount: parseFloat(transaction.Summa) || 0,
+                        amount: parseSwedishNumber(transaction.Summa),
                         account: account,
                         type: fileType,
                         saldo: null,
@@ -388,8 +397,8 @@
                     };
                 } else {
                     // Format för bank-CSV (checkkonto/personkonto)
-                    const amount = parseFloat(transaction.Belopp) || 0;
-                    const saldo = transaction.Saldo ? parseFloat(transaction.Saldo.replace(',', '.')) : null;
+                    const amount = parseSwedishNumber(transaction.Belopp);
+                    const saldo = parseSwedishNumber(transaction.Saldo);
                     
                     return {
                         date: transaction.Bokföringsdag,
@@ -418,6 +427,7 @@
                         header: true,
                         delimiter: ';',
                         skipEmptyLines: true,
+                        delimitersToGuess: [';', ',', '\t'],  // Testa olika avgränsare
                         complete: (results) => {
                             if (results.errors.length > 0) {
                                 reject(new Error(`Parse fel: ${results.errors[0].message}`));

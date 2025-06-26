@@ -369,6 +369,8 @@
                 toDate: '',
                 search: ''
             });
+            const [currentPage, setCurrentPage] = useState(1);
+            const [itemsPerPage, setItemsPerPage] = useState(100);
             const [accounts] = useState(['alla']);
 
             // Funktion för att normalisera transaktionsdata
@@ -499,6 +501,7 @@
             // Effekt för att uppdatera data när filter ändras
             useEffect(() => {
                 refreshData();
+                setCurrentPage(1); // Återställ till första sidan när filter ändras
             }, [filters]);
 
             // Drag & Drop hantering
@@ -532,6 +535,16 @@
             // Formatera datum
             const formatDate = (dateString) => {
                 return new Date(dateString).toLocaleDateString('sv-SE');
+            };
+
+            // Paginering
+            const totalPages = Math.ceil(transactions.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const currentTransactions = transactions.slice(startIndex, endIndex);
+
+            const goToPage = (page) => {
+                setCurrentPage(Math.max(1, Math.min(page, totalPages)));
             };
 
             return (
@@ -639,6 +652,21 @@
                                 value={filters.search}
                                 onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                             />
+
+                            <select 
+                                className="filter-select"
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(parseInt(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <option value={50}>50 per sida</option>
+                                <option value={100}>100 per sida</option>
+                                <option value={250}>250 per sida</option>
+                                <option value={500}>500 per sida</option>
+                                <option value={transactions.length}>Alla ({transactions.length})</option>
+                            </select>
                         </div>
 
                         <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
@@ -652,7 +680,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {transactions.slice(0, 100).map((transaction, index) => (
+                                    {currentTransactions.map((transaction, index) => (
                                         <tr key={transaction.id || index}>
                                             <td>{formatDate(transaction.date)}</td>
                                             <td>{transaction.description}</td>
@@ -664,11 +692,68 @@
                                     ))}
                                 </tbody>
                             </table>
-                            {transactions.length > 100 && (
-                                <p style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
-                                    Visar de senaste 100 transaktionerna av {transactions.length}
-                                </p>
+
+                            {/* Paginering */}
+                            {totalPages > 1 && (
+                                <div style={{ 
+                                    display: 'flex', 
+                                    justifyContent: 'center', 
+                                    alignItems: 'center', 
+                                    gap: '10px', 
+                                    padding: '20px',
+                                    flexWrap: 'wrap'
+                                }}>
+                                    <button 
+                                        className="upload-button"
+                                        onClick={() => goToPage(1)} 
+                                        disabled={currentPage === 1}
+                                        style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+                                    >
+                                        ⏮️ Första
+                                    </button>
+                                    
+                                    <button 
+                                        className="upload-button"
+                                        onClick={() => goToPage(currentPage - 1)} 
+                                        disabled={currentPage === 1}
+                                        style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+                                    >
+                                        ⬅️ Föregående
+                                    </button>
+
+                                    <span style={{ 
+                                        padding: '10px 20px', 
+                                        background: 'white', 
+                                        borderRadius: '10px',
+                                        border: '2px solid #e1e8ed',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        Sida {currentPage} av {totalPages}
+                                    </span>
+
+                                    <button 
+                                        className="upload-button"
+                                        onClick={() => goToPage(currentPage + 1)} 
+                                        disabled={currentPage === totalPages}
+                                        style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+                                    >
+                                        Nästa ➡️
+                                    </button>
+                                    
+                                    <button 
+                                        className="upload-button"
+                                        onClick={() => goToPage(totalPages)} 
+                                        disabled={currentPage === totalPages}
+                                        style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+                                    >
+                                        Sista ⏭️
+                                    </button>
+                                </div>
                             )}
+
+                            <div style={{ textAlign: 'center', padding: '10px', color: '#7f8c8d' }}>
+                                Visar {startIndex + 1}-{Math.min(endIndex, transactions.length)} av {transactions.length} transaktioner
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -82,13 +82,21 @@ function initDatabase() {
 }
 
 // Hjälpfunktioner
+function parseSwedishNumber(value) {
+    if (!value) return 0;
+    // Konvertera till string och ersätt komma med punkt
+    const stringValue = String(value).trim();
+    const normalizedValue = stringValue.replace(',', '.');
+    return parseFloat(normalizedValue) || 0;
+}
+
 function normalizeTransaction(transaction, account, fileType) {
     if (fileType === 'simple') {
         // Format för 25.csv
         return {
             date: transaction.Datum,
             description: (transaction.Beskrivning || '').trim(),
-            amount: parseFloat(transaction.Summa) || 0,
+            amount: parseSwedishNumber(transaction.Summa),
             account: account,
             type: fileType,
             saldo: null,
@@ -98,8 +106,8 @@ function normalizeTransaction(transaction, account, fileType) {
         };
     } else {
         // Format för bank-CSV (checkkonto/personkonto)
-        const amount = parseFloat(transaction.Belopp) || 0;
-        const saldo = transaction.Saldo ? parseFloat(transaction.Saldo.replace(',', '.')) : null;
+        const amount = parseSwedishNumber(transaction.Belopp);
+        const saldo = parseSwedishNumber(transaction.Saldo);
         
         return {
             date: transaction.Bokföringsdag,

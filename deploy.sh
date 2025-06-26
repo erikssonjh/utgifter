@@ -4,7 +4,7 @@
 RESOURCE_GROUP="utgifter-rg"
 APP_NAME="utgifter-app"
 LOCATION="northeurope"
-SUBSCRIPTION_ID="your-subscription-id"
+SUBSCRIPTION_ID="e4cd7498-dbf9-4a51-9a99-33643205d82d"
 
 echo "🚀 Deploying Utgifter to Azure..."
 

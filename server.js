@@ -54,7 +54,7 @@ function initDatabase() {
             mottagare TEXT,
             uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
+        );
     `;
 
     const createAccountsTable = `
@@ -63,7 +63,7 @@ function initDatabase() {
             name TEXT UNIQUE NOT NULL,
             type TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
+        );
     `;
 
     const createIndexes = `

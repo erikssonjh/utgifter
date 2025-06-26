@@ -1,0 +1,50 @@
+{
+  "name": "utgifter",
+  "version": "1.0.0",
+  "description": "En webbaserad applikation för att spåra och analysera ekonomiska transaktioner",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "npm run build:frontend",
+    "build:frontend": "mkdir -p public && cp frontend/index.html public/",
+    "test": "jest",
+    "setup": "npm run create-dirs && npm run build",
+    "create-dirs": "mkdir -p uploads public",
+    "azure:deploy": "az webapp deployment source config-zip --resource-group $RESOURCE_GROUP --name $APP_NAME --src deploy.zip"
+  },
+  "keywords": [
+    "expense-tracker",
+    "financial",
+    "csv",
+    "transactions",
+    "azure",
+    "nodejs"
+  ],
+  "author": "erikssonjh",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "sqlite3": "^5.1.6",
+    "multer": "^1.4.5-lts.1",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erikssonjh/utgifter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/erikssonjh/utgifter/issues"
+  },
+  "homepage": "https://github.com/erikssonjh/utgifter#readme"
+}

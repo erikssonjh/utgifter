@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Utgiftsspårare</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.05);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .upload-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select, .filter-input {
+            padding: 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            transition: border-color 0.3s ease;
+        }
+        
+        .filter-select:focus, .filter-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .transactions-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .transactions-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        
+        .transactions-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .amount-positive {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .amount-negative {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .chart-container {
+            grid-column: 1 / -1;
+            height: 400px;
+            position: relative;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // Databas-klass för att hantera transaktioner i minnet
+        class TransactionDB {
+            constructor() {
+                this.transactions = [];
+                this.accounts = new Set();
+            }
+
+            addTransactions(newTransactions) {
+                // Lägg till ID för varje transaktion
+                const transactionsWithId = newTransactions.map((t, index) => ({
+                    ...t,
+                    id: Date.now() + index,
+                    uploadedAt: new Date().toISOString()
+                }));
+                
+                this.transactions.push(...transactionsWithId);
+                
+                // Uppdatera kontolista
+                newTransactions.forEach(t => {
+                    if (t.account) this.accounts.add(t.account);
+                });
+                
+                return transactionsWithId.length;
+            }
+
+            getTransactions(filters = {}) {
+                let filtered = [...this.transactions];
+
+                if (filters.account && filters.account !== 'alla') {
+                    filtered = filtered.filter(t => t.account === filters.account);
+                }
+
+                if (filters.fromDate) {
+                    filtered = filtered.filter(t => new Date(t.date) >= new Date(filters.fromDate));
+                }
+
+                if (filters.toDate) {
+                    filtered = filtered.filter(t => new Date(t.date) <= new Date(filters.toDate));
+                }
+
+                if (filters.search) {
+                    const searchLower = filters.search.toLowerCase();
+                    filtered = filtered.filter(t => 
+                        t.description.toLowerCase().includes(searchLower)
+                    );
+                }
+
+                return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+
+            getMonthlyStats(year, month) {
+                const filtered = this.transactions.filter(t => {
+                    const date = new Date(t.date);
+                    return date.getFullYear() === year && date.getMonth() === month - 1;
+                });
+
+                const income = filtered.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+                const expenses = filtered.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+                return {
+                    income,
+                    expenses,
+                    net: income - expenses,
+                    transactionCount: filtered.length
+                };
+            }
+
+            getYearlyStats(year) {
+                const filtered = this.transactions.filter(t => {
+                    const date = new Date(t.date);
+                    return date.getFullYear() === year;
+                });
+
+                const income = filtered.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+                const expenses = filtered.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+                return {
+                    income,
+                    expenses,
+                    net: income - expenses,
+                    transactionCount: filtered.length
+                };
+            }
+
+            getMonthlyTrends(year) {
+                const months = [];
+                for (let month = 1; month <= 12; month++) {
+                    const stats = this.getMonthlyStats(year, month);
+                    months.push({
+                        month,
+                        monthName: new Date(year, month - 1).toLocaleDateString('sv-SE', { month: 'long' }),
+                        ...stats
+                    });
+                }
+                return months;
+            }
+
+            clear() {
+                this.transactions = [];
+                this.accounts.clear();
+            }
+        }
+
+        // Instansiera databasen
+        const db = new TransactionDB();
+
+        function ExpenseTracker() {
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [transactions, setTransactions] = useState([]);
+            const [stats, setStats] = useState({ income: 0, expenses: 0, net: 0, transactionCount: 0 });
+            const [filters, setFilters] = useState({
+                account: 'alla',
+                fromDate: '',
+                toDate: '',
+                search: ''
+            });
+            const [accounts] = useState(['alla']);
+
+            // Funktion för att normalisera transaktionsdata
+            const normalizeTransaction = (transaction, account, fileType) => {
+                if (fileType === 'simple') {
+                    // Format för 25.csv
+                    return {
+                        date: transaction.Datum,
+                        description: transaction.Beskrivning?.trim() || '',
+                        amount: parseFloat(transaction.Summa) || 0,
+                        account: account,
+                        type: fileType,
+                        saldo: null,
+                        currency: 'SEK'
+                    };
+                } else {
+                    // Format för bank-CSV (checkkonto/personkonto)
+                    const amount = parseFloat(transaction.Belopp) || 0;
+                    const saldo = transaction.Saldo ? parseFloat(transaction.Saldo.replace(',', '.')) : null;
+                    
+                    return {
+                        date: transaction.Bokföringsdag,
+                        description: transaction.Rubrik?.trim() || '',
+                        amount: amount,
+                        account: account,
+                        type: fileType,
+                        saldo: saldo,
+                        currency: transaction.Valuta || 'SEK',
+                        avsändare: transaction.Avsändare,
+                        mottagare: transaction.Mottagare
+                    };
+                }
+            };
+
+            // Funktion för att parsa CSV
+            const parseCSV = (content, fileName) => {
+                return new Promise((resolve, reject) => {
+                    Papa.parse(content, {
+                        header: true,
+                        delimiter: ';',
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            if (results.errors.length > 0) {
+                                reject(new Error(`Parse fel: ${results.errors[0].message}`));
+                                return;
+                            }
+
+                            try {
+                                // Bestäm filtyp och kontonamn
+                                let fileType, account;
+                                
+                                if (fileName.includes('CHECKKONTO')) {
+                                    fileType = 'checkkonto';
+                                    account = 'Checkkonto';
+                                } else if (fileName.includes('PERSONKONTO')) {
+                                    fileType = 'personkonto';
+                                    account = 'Personkonto';
+                                } else {
+                                    fileType = 'simple';
+                                    account = 'Kort/Kort';
+                                }
+
+                                // Normalisera alla transaktioner
+                                const normalizedTransactions = results.data
+                                    .filter(row => row.Datum || row.Bokföringsdag) // Filtrera bort tomma rader
+                                    .map(row => normalizeTransaction(row, account, fileType));
+
+                                resolve(normalizedTransactions);
+                            } catch (err) {
+                                reject(new Error(`Fel vid normalisering: ${err.message}`));
+                            }
+                        },
+                        error: (error) => {
+                            reject(new Error(`CSV parse fel: ${error.message}`));
+                        }
+                    });
+                });
+            };
+
+            // Hantera filuppladdning
+            const handleFileUpload = async (files) => {
+                setLoading(true);
+                setError('');
+
+                try {
+                    let totalImported = 0;
+
+                    for (const file of files) {
+                        const content = await file.text();
+                        const transactions = await parseCSV(content, file.name);
+                        const imported = db.addTransactions(transactions);
+                        totalImported += imported;
+                    }
+
+                    // Uppdatera UI
+                    refreshData();
+                    alert(`Importerade ${totalImported} transaktioner från ${files.length} fil(er)!`);
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Uppdatera data
+            const refreshData = () => {
+                const filteredTransactions = db.getTransactions(filters);
+                setTransactions(filteredTransactions);
+
+                // Beräkna statistik
+                const income = filteredTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+                const expenses = filteredTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+                setStats({
+                    income,
+                    expenses,
+                    net: income - expenses,
+                    transactionCount: filteredTransactions.length
+                });
+            };
+
+            // Effekt för att uppdatera data när filter ändras
+            useEffect(() => {
+                refreshData();
+            }, [filters]);
+
+            // Drag & Drop hantering
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('dragover');
+            };
+
+            const handleDragLeave = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.csv'));
+                if (files.length > 0) {
+                    handleFileUpload(files);
+                }
+            };
+
+            // Formatera belopp
+            const formatAmount = (amount) => {
+                return new Intl.NumberFormat('sv-SE', {
+                    style: 'currency',
+                    currency: 'SEK'
+                }).format(amount);
+            };
+
+            // Formatera datum
+            const formatDate = (dateString) => {
+                return new Date(dateString).toLocaleDateString('sv-SE');
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>💰 Utgiftsspårare</h1>
+                        <p>Hantera och analysera dina ekonomiska transaktioner</p>
+                    </div>
+
+                    {error && (
+                        <div className="error">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="dashboard">
+                        <div className="card">
+                            <h2>📁 Importera Data</h2>
+                            <div 
+                                className="upload-area"
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onClick={() => document.getElementById('file-input').click()}
+                            >
+                                <div>
+                                    <h3>Dra och släpp CSV-filer här</h3>
+                                    <p>eller klicka för att välja filer</p>
+                                    <button className="upload-button">Välj Filer</button>
+                                </div>
+                            </div>
+                            <input
+                                id="file-input"
+                                type="file"
+                                multiple
+                                accept=".csv"
+                                className="file-input"
+                                onChange={(e) => {
+                                    const files = Array.from(e.target.files);
+                                    if (files.length > 0) {
+                                        handleFileUpload(files);
+                                    }
+                                }}
+                            />
+                            {loading && <div className="loading">Importerar data...</div>}
+                        </div>
+
+                        <div className="card">
+                            <h2>📊 Snabbstatistik</h2>
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="stat-value">{formatAmount(stats.income)}</div>
+                                    <div className="stat-label">Inkomster</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{formatAmount(stats.expenses)}</div>
+                                    <div className="stat-label">Utgifter</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{formatAmount(stats.net)}</div>
+                                    <div className="stat-label">Netto</div>
+                                </div>
+                                <div className="stat-card">
+                                    <div className="stat-value">{stats.transactionCount}</div>
+                                    <div className="stat-label">Transaktioner</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <h2>🔍 Filter och Sök</h2>
+                        <div className="filters">
+                            <select 
+                                className="filter-select"
+                                value={filters.account}
+                                onChange={(e) => setFilters(prev => ({ ...prev, account: e.target.value }))}
+                            >
+                                <option value="alla">Alla konton</option>
+                                <option value="Checkkonto">Checkkonto</option>
+                                <option value="Personkonto">Personkonto</option>
+                                <option value="Kort/Kort">Kort</option>
+                            </select>
+
+                            <input
+                                type="date"
+                                className="filter-input"
+                                placeholder="Från datum"
+                                value={filters.fromDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))}
+                            />
+
+                            <input
+                                type="date"
+                                className="filter-input"
+                                placeholder="Till datum"
+                                value={filters.toDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))}
+                            />
+
+                            <input
+                                type="text"
+                                className="filter-input"
+                                placeholder="Sök i beskrivning..."
+                                value={filters.search}
+                                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                            />
+                        </div>
+
+                        <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                            <table className="transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Datum</th>
+                                        <th>Beskrivning</th>
+                                        <th>Konto</th>
+                                        <th>Belopp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {transactions.slice(0, 100).map((transaction, index) => (
+                                        <tr key={transaction.id || index}>
+                                            <td>{formatDate(transaction.date)}</td>
+                                            <td>{transaction.description}</td>
+                                            <td>{transaction.account}</td>
+                                            <td className={transaction.amount >= 0 ? 'amount-positive' : 'amount-negative'}>
+                                                {formatAmount(transaction.amount)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {transactions.length > 100 && (
+                                <p style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
+                                    Visar de senaste 100 transaktionerna av {transactions.length}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ExpenseTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>

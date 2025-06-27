@@ -1,150 +1,54 @@
-# azure-pipelines.yml - Azure DevOps CI/CD Pipeline
-trigger:
-- main
-
-pool:
-  vmImage: 'ubuntu-latest'
-
-variables:
-  azureSubscription: 'your-azure-subscription'
-  appName: 'utgifter-app'
-  resourceGroup: 'utgifter-rg'
-  location: 'North Europe'
-
-stages:
-- stage: Build
-  jobs:
-  - job: BuildApp
-    steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '18.x'
-      displayName: 'Install Node.js'
-
-    - script: |
-        npm ci
-        npm run build
-        npm test
-      displayName: 'Install dependencies, build and test'
-
-    - task: ArchiveFiles@2
-      inputs:
-        rootFolderOrFile: '.'
-        includeRootFolder: false
-        archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/utgiftsspaarare.zip'
-        replaceExistingArchive: true
-      displayName: 'Archive application'
-
-    - publish: '$(Build.ArtifactStagingDirectory)/utgiftsspaarare.zip'
-      artifact: 'webapp'
-
-- stage: Deploy
-  dependsOn: Build
-  jobs:
-  - deployment: DeployToAzure
-    environment: 'production'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: AzureRmWebAppDeployment@4
-            inputs:
-              ConnectionType: 'AzureRM'
-              azureSubscription: '$(azureSubscription)'
-              appType: 'webAppLinux'
-              WebAppName: '$(appName)'
-              packageForLinux: '$(Pipeline.Workspace)/webapp/utgiftsspaarare.zip'
-              RuntimeStack: 'NODE|18-lts'
-              StartupCommand: 'npm start'
-
----
-
-# bicep/main.bicep - Infrastructure as Code för Azure
-param appName string = 'utgifter-app'
-param location string = resourceGroup().location
-param sku string = 'F1' // Free tier, ändra till 'B1' för Basic
-
-// App Service Plan
-resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
-  name: '${appName}-plan'
-  location: location
-  sku: {
-    name: sku
-    tier: sku == 'F1' ? 'Free' : 'Basic'
-  }
-  properties: {
-    reserved: true
-  }
-  kind: 'linux'
-}
-
-// Web App
-resource webApp 'Microsoft.Web/sites@2022-03-01' = {
-  name: appName
-  location: location
-  properties: {
-    serverFarmId: appServicePlan.id
-    siteConfig: {
-      linuxFxVersion: 'NODE|18-lts'
-      appSettings: [
-        {
-          name: 'NODE_ENV'
-          value: 'production'
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '18.x'
-        }
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
-      ]
-      nodeVersion: '18.x'
-    }
-    httpsOnly: true
-  }
-}
-
-// Storage Account för större databaser (optional)
-resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
-  name: '${replace(appName, '-', '')}storage'
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    accessTier: 'Hot'
-  }
-}
-
-output webAppUrl string = 'https://${webApp.properties.defaultHostName}'
-output storageAccountName string = storageAccount.name
-
----
-
-# deploy.sh - Deployment script
 #!/bin/bash
 
-# Konfigurera variabler
+# 🎯 Azure Deployment Script för Utgifter
+# Din specifika konfiguration
+
 RESOURCE_GROUP="utgifter-rg"
 APP_NAME="utgifter-app"
 LOCATION="northeurope"
 SUBSCRIPTION_ID="e4cd7498-dbf9-4a51-9a99-33643205d82d"
 
 echo "🚀 Deploying Utgifter to Azure..."
+echo "📍 Subscription: $SUBSCRIPTION_ID"
+echo "📍 Resource Group: $RESOURCE_GROUP"
+echo "📍 App Name: $APP_NAME"
+echo "📍 Location: $LOCATION"
+
+# Kontrollera att vi är i rätt mapp
+if [ ! -f "package.json" ]; then
+    echo "❌ Fel: package.json hittades inte. Kör detta script från projektmappen 'utgifter'"
+    exit 1
+fi
 
 # Logga in på Azure (om inte redan inloggad)
-az login
+echo "🔐 Kontrollerar Azure-inloggning..."
+az account show > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "🔐 Loggar in på Azure..."
+    az login
+else
+    echo "✅ Redan inloggad på Azure"
+fi
 
 # Sätt subscription
+echo "🎯 Sätter subscription..."
 az account set --subscription $SUBSCRIPTION_ID
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: Kunde inte sätta subscription. Kontrollera ditt Subscription ID"
+    exit 1
+fi
+
+echo "✅ Subscription satt: $SUBSCRIPTION_ID"
 
 # Skapa resource group om den inte finns
-echo "📦 Creating resource group..."
+echo "📦 Skapar resource group..."
 az group create --name $RESOURCE_GROUP --location $LOCATION
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: Kunde inte skapa resource group"
+    exit 1
+fi
+
+echo "✅ Resource group skapad/verifierad: $RESOURCE_GROUP"
 
 # Deploy infrastructure
 echo "🏗️ Deploying infrastructure..."
@@ -153,51 +57,62 @@ az deployment group create \
   --template-file bicep/main.bicep \
   --parameters appName=$APP_NAME
 
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: Infrastructure deployment misslyckades"
+    exit 1
+fi
+
+echo "✅ Infrastructure deployment slutförd"
+
 # Bygg applikationen
-echo "🔨 Building application..."
+echo "🔨 Bygger applikation..."
 npm ci
-npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: npm ci misslyckades"
+    exit 1
+fi
+
+echo "✅ Dependencies installerade"
 
 # Skapa deployment paket
-echo "📦 Creating deployment package..."
-zip -r deploy.zip . -x "node_modules/*" ".git/*" "*.log"
+echo "📦 Skapar deployment paket..."
+zip -r deploy.zip . -x "node_modules/*" ".git/*" "*.log" "transactions.db"
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: Kunde inte skapa deployment paket"
+    exit 1
+fi
+
+echo "✅ Deployment paket skapat"
 
 # Deploy applikationen
-echo "🚢 Deploying application..."
+echo "🚢 Deploying applikation till Azure..."
 az webapp deployment source config-zip \
   --resource-group $RESOURCE_GROUP \
   --name $APP_NAME \
   --src deploy.zip
 
+if [ $? -ne 0 ]; then
+    echo "❌ Fel: App deployment misslyckades"
+    exit 1
+fi
+
+echo "✅ Applikation deployment slutförd"
+
 # Hämta URL
+echo "🌐 Hämtar applikations-URL..."
 APP_URL=$(az webapp show --resource-group $RESOURCE_GROUP --name $APP_NAME --query defaultHostName -o tsv)
-echo "✅ Deployment complete!"
-echo "🌐 Your app is available at: https://$APP_URL"
 
 # Rensa
+echo "🧹 Rensar temporära filer..."
 rm -f deploy.zip
 
-echo "🎉 Done!"
-
----
-
-# .env.example - Environment variables template
-# Kopiera till .env och fyll i dina värden
-
-# Server konfiguration
-PORT=3001
-NODE_ENV=development
-
-# Databas
-DATABASE_PATH=./transactions.db
-
-# Azure konfiguration (för produktion)
-AZURE_STORAGE_CONNECTION_STRING=
-AZURE_STORAGE_CONTAINER_NAME=
-
-# Säkerhet (för produktion)
-SESSION_SECRET=your-secret-key-here
-JWT_SECRET=your-jwt-secret-here
-
-# Logging
-LOG_LEVEL=info
+echo ""
+echo "🎉 DEPLOYMENT SLUTFÖRD! 🎉"
+echo "=================================="
+echo "🌐 Din app finns på: https://$APP_URL"
+echo "📊 Azure Portal: https://portal.azure.com"
+echo "📁 Resource Group: $RESOURCE_GROUP"
+echo ""
+echo "⏳ Applikationen kan ta 2-3 minuter att starta första gången"
+echo "🔄 Testa URL:en om några minuter om den inte fungerar direkt"
+echo ""

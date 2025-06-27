@@ -28,7 +28,7 @@ const upload = multer({
 });
 
 // Databas-setup
-const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/transactions.db' : './transactions.db';
+const dbPath = process.env.NODE_ENV === 'production' ? '/home/data/transactions.db' : './transactions.db';
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Fel vid anslutning till databas:', err);
